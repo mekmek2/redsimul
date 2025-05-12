@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8">
+  <title>전투 기여도 시뮬레이터</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f7f9fc;
+      color: #333;
+    }
+
+    h1 {
+      background-color: #2c3e50;
+      color: white;
+      margin: 0;
+      padding: 16px 24px;
+    }
+
+    .container {
+      padding: 24px;
+      max-width: 960px;
+      margin: auto;
+    }
+
+    .section {
+      background-color: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 24px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+    }
+
+    label {
+      display: inline-block;
+      margin-bottom: 8px;
+    }
+
+    input[type='number'] {
+      width: 60px;
+      padding: 4px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+    }
+
+    th,
+    td {
+      border: 1px solid #e0e0e0;
+      padding: 8px;
+      text-align: center;
+    }
+
+    th {
+      background-color: #f0f2f5;
+    }
+
+    button {
+      padding: 6px 12px;
+      margin-top: 10px;
+      border: none;
+      border-radius: 4px;
+      background-color: #3498db;
+      color: white;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #2980b9;
+    }
+
+    button.small {
+      background-color: #e74c3c;
+    }
+
+    #summary {
+      margin-top: 10px;
+      font-weight: bold;
+    }
+
+    pre {
+      background-color: #f5f5f5;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>전투 기여도 시뮬레이터</h1>
+  <div class="container">
+    <div class="section">
+      <h2>기준 전투 정보</h2>
+      <label>총 전투 시간:
+        <input type="number" id="totalMin" value="15">분
+        <input type="number" id="totalSec" value="0">초
+      </label><br>
+      <label>공격 불가 시간:
+        <input type="number" id="fixedMin" value="3">분
+        <input type="number" id="fixedSec" value="0">초
+      </label>
+    </div>
+
+    <div class="section">
+      <h2>기여도 및 설정</h2>
+      <table id="playerTable">
+        <tr>
+          <th>인원</th>
+          <th>기준 기여도 (%)</th>
+          <th>변화 기여도 (%)</th>
+          <th>DPS 변화율 (%)</th>
+          <th>기준 참여율 (%)</th>
+          <th>변화 참여율 (%)</th>
+          <th>삭제</th>
+        </tr>
+      </table>
+      <button onclick="addPlayer()">인원 추가</button>
+      <div id="summary">총 기준 기여도: 0%</div>
+    </div>
+
+    <div class="section">
+      <button onclick="runSimulation()">시뮬레이션 실행</button>
+    </div>
+
+    <div class="section">
+      <h2>결과</h2>
+      <pre id="result"></pre>
+      <canvas id="chart" width="600" height="300"></canvas>
+    </div>
+  </div>
+
+  <script>
+    let playerIndex = 0;
+
+    function addPlayer() {
+      const table = document.getElementById("playerTable");
+      const row = table.insertRow();
+      row.setAttribute("data-id", playerIndex);
+
+      row.innerHTML = `
+        <td class='label'>인원</td>
+        <td><input type='number' class='base' value='10' onchange='updateTotalContribution()'></td>
+        <td><input type='number' class='modbase' value='' onchange='updateTotalContribution()'></td>
+        <td><input type='number' class='mod' value='0'></td>
+        <td><input type='number' class='time' value='100'></td>
+        <td><input type='number' class='modtime' value=''></td>
+        <td><button class='small' onclick='removePlayer(this)'>삭제</button></td>
+      `;
+      playerIndex++;
+      updateLabels();
+      updateTotalContribution();
+    }
+
+    function removePlayer(button) {
+      const row = button.parentNode.parentNode;
+      row.remove();
+      updateLabels();
+      updateTotalContribution();
+    }
+
+    function updateLabels() {
+      const labels = document.querySelectorAll("#playerTable .label");
+      labels.forEach((cell, idx) => {
+        cell.textContent = `인원 ${idx + 1}`;
+      });
+    }
+
+    function updateTotalContribution() {
+      const baseInputs = document.querySelectorAll("#playerTable .base");
+      const modbaseInputs = document.querySelectorAll("#playerTable .modbase");
+      let sum = 0;
+      for (let i = 0; i < baseInputs.length; i++) {
+        let value = parseFloat(modbaseInputs[i].value);
+        if (isNaN(value)) value = parseFloat(baseInputs[i].value);
+        if (!isNaN(value)) sum += value;
+      }
+      document.getElementById("summary").innerText = `총 기준 기여도: ${sum.toFixed(2)}%`;
+    }
+
+    function getSeconds(minId, secId) {
+      const min = parseFloat(document.getElementById(minId).value);
+      const sec = parseFloat(document.getElementById(secId).value);
+      return (isNaN(min) ? 0 : min) * 60 + (isNaN(sec) ? 0 : sec);
+    }
+
+    function formatTime(seconds) {
+      const m = Math.floor(seconds / 60);
+      const s = Math.round(seconds % 60);
+      return `${m}분 ${s}초`;
+    }
+
+    function runSimulation() {
+      const totalTime = getSeconds("totalMin", "totalSec");
+      const fixedTime = getSeconds("fixedMin", "fixedSec");
+      const attackTime = totalTime - fixedTime;
+
+      const rows = document.querySelectorAll("#playerTable tr[data-id]");
+      let totalBaseDPS = 0;
+      const players = [];
+
+      rows.forEach((row, i) => {
+        const label = `인원 ${i + 1}`;
+        const base = parseFloat(row.querySelector(".base").value);
+        const modbaseRaw = row.querySelector(".modbase").value;
+        const modbase = modbaseRaw === '' ? null : parseFloat(modbaseRaw);
+        const mod = parseFloat(row.querySelector(".mod").value);
+        const baseTime = parseFloat(row.querySelector(".time").value);
+        const modTimeRaw = row.querySelector(".modtime").value;
+        const finalTime = (modTimeRaw !== '' ? parseFloat(modTimeRaw) : baseTime);
+
+        const usedBase = modbase !== null ? modbase : base;
+        const finalDPS = usedBase * (1 + mod / 100) * (finalTime / 100);
+        const baseDPS = base * (baseTime / 100);
+
+        players.push({
+          label,
+          isManual: modbase !== null,
+          baseDPS,
+          rawDPS: finalDPS,
+          target: modbase // may be null
+        });
+
+        totalBaseDPS += baseDPS;
+      });
+
+      const manualTotal = players.filter(p => p.isManual).reduce((sum, p) => sum + p.target, 0);
+      const autoPlayers = players.filter(p => !p.isManual);
+      const autoTotalDPS = autoPlayers.reduce((sum, p) => sum + p.rawDPS, 0);
+
+      const remaining = 100 - manualTotal;
+      const scaling = remaining / autoTotalDPS;
+
+      let resultText = "";
+      const baseList = [];
+      const finalList = [];
+      const labels = [];
+
+      players.forEach(p => {
+        baseList.push(p.baseDPS);
+        labels.push(p.label);
+        let finalValue;
+        if (p.isManual) {
+          finalValue = p.rawDPS;
+          resultText += `${p.label}: 고정 기여도 ${p.target.toFixed(2)}%\n`;
+        } else {
+          finalValue = p.rawDPS * scaling;
+          resultText += `${p.label}: 계산된 기여도 ${finalValue.toFixed(2)}%\n`;
+        }
+        finalList.push(finalValue);
+      });
+
+      const totalFinalDPS = players.reduce((sum, p) => {
+        return sum + p.rawDPS;
+      }, 0);
+
+      const newAttackTime = (100 / totalFinalDPS) * attackTime;
+      const newTotalTime = fixedTime + newAttackTime;
+      const timeDiff = newTotalTime - totalTime;
+      const timeChangeStr = timeDiff === 0 ? "(변화 없음)" : (timeDiff > 0 ? `(+${timeDiff.toFixed(1)}초)` : `(${timeDiff.toFixed(1)}초 단축)`);
+
+      resultText = `총 전투 시간: ${formatTime(newTotalTime)} (${newTotalTime.toFixed(1)}초) ${timeChangeStr}\n` +
+        `  - 고정 시간: ${formatTime(fixedTime)}\n` +
+        `  - 공격 시간: ${formatTime(newAttackTime)} (${newAttackTime.toFixed(1)}초)\n\n` + resultText;
+
+      document.getElementById("result").innerText = resultText;
+      drawChart(labels, baseList, finalList);
+    }
+
+    function drawChart(labels, baseData, finalData) {
+      const ctx = document.getElementById('chart').getContext('2d');
+      if (window.chartInstance) window.chartInstance.destroy();
+      window.chartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: '기준 DPS',
+              data: baseData,
+              backgroundColor: 'rgba(0, 123, 255, 0.5)'
+            },
+            {
+              label: '변화 반영 DPS',
+              data: finalData,
+              backgroundColor: 'rgba(255, 99, 132, 0.5)'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: {
+              beginAtZero: true,
+              title: { display: true, text: 'DPS 기여량' }
+            }
+          }
+        }
+      });
+    }
+  </script>
+</body>
+
+</html>
