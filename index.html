@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="ko">
-
 <head>
   <meta charset="UTF-8">
   <title>전투 기여도 시뮬레이터</title>
@@ -33,7 +32,7 @@
       border-radius: 8px;
       padding: 20px;
       margin-bottom: 24px;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
     }
 
     label {
@@ -54,8 +53,7 @@
       margin-top: 12px;
     }
 
-    th,
-    td {
+    th, td {
       border: 1px solid #e0e0e0;
       padding: 8px;
       text-align: center;
@@ -96,18 +94,17 @@
     }
   </style>
 </head>
-
 <body>
   <h1>전투 기여도 시뮬레이터</h1>
   <div class="container">
     <div class="section">
       <h2>기준 전투 정보</h2>
-      <label>총 전투 시간:
-        <input type="number" id="totalMin" value="15">분
+      <label>총 전투 시간: 
+        <input type="number" id="totalMin" value="15">분 
         <input type="number" id="totalSec" value="0">초
       </label><br>
-      <label>공격 불가 시간:
-        <input type="number" id="fixedMin" value="3">분
+      <label>공격 불가 시간: 
+        <input type="number" id="fixedMin" value="3">분 
         <input type="number" id="fixedSec" value="0">초
       </label>
     </div>
@@ -206,7 +203,6 @@
       const attackTime = totalTime - fixedTime;
 
       const rows = document.querySelectorAll("#playerTable tr[data-id]");
-      let totalBaseDPS = 0;
       const players = [];
 
       rows.forEach((row, i) => {
@@ -217,11 +213,14 @@
         const mod = parseFloat(row.querySelector(".mod").value);
         const baseTime = parseFloat(row.querySelector(".time").value);
         const modTimeRaw = row.querySelector(".modtime").value;
-        const finalTime = (modTimeRaw !== '' ? parseFloat(modTimeRaw) : baseTime);
+        const finalTime = modTimeRaw !== '' ? parseFloat(modTimeRaw) : baseTime;
 
-        const usedBase = modbase !== null ? modbase : base;
-        const finalDPS = usedBase * (1 + mod / 100) * (finalTime / 100);
-        const baseDPS = base * (baseTime / 100);
+        const actualBase = base / (baseTime / 100); // 기준 DPS = 기여도 / 참여율
+        const usedBase = modbase !== null ? modbase : actualBase;
+        const actualTime = finalTime / 100;
+
+        const finalDPS = usedBase * (1 + mod / 100) * actualTime;
+        const baseDPS = actualBase * baseTime / 100;
 
         players.push({
           label,
@@ -230,8 +229,6 @@
           rawDPS: finalDPS,
           target: modbase // may be null
         });
-
-        totalBaseDPS += baseDPS;
       });
 
       const manualTotal = players.filter(p => p.isManual).reduce((sum, p) => sum + p.target, 0);
@@ -241,10 +238,14 @@
       const remaining = 100 - manualTotal;
       const scaling = remaining / autoTotalDPS;
 
-      let resultText = "";
       const baseList = [];
       const finalList = [];
       const labels = [];
+      let resultText = "";
+
+      const totalFinalDPS = players.reduce((sum, p) => {
+        return sum + p.rawDPS;
+      }, 0);
 
       players.forEach(p => {
         baseList.push(p.baseDPS);
@@ -260,18 +261,14 @@
         finalList.push(finalValue);
       });
 
-      const totalFinalDPS = players.reduce((sum, p) => {
-        return sum + p.rawDPS;
-      }, 0);
-
       const newAttackTime = (100 / totalFinalDPS) * attackTime;
       const newTotalTime = fixedTime + newAttackTime;
       const timeDiff = newTotalTime - totalTime;
       const timeChangeStr = timeDiff === 0 ? "(변화 없음)" : (timeDiff > 0 ? `(+${timeDiff.toFixed(1)}초)` : `(${timeDiff.toFixed(1)}초 단축)`);
 
       resultText = `총 전투 시간: ${formatTime(newTotalTime)} (${newTotalTime.toFixed(1)}초) ${timeChangeStr}\n` +
-        `  - 고정 시간: ${formatTime(fixedTime)}\n` +
-        `  - 공격 시간: ${formatTime(newAttackTime)} (${newAttackTime.toFixed(1)}초)\n\n` + resultText;
+                   `  - 고정 시간: ${formatTime(fixedTime)}\n` +
+                   `  - 공격 시간: ${formatTime(newAttackTime)} (${newAttackTime.toFixed(1)}초)\n\n` + resultText;
 
       document.getElementById("result").innerText = resultText;
       drawChart(labels, baseList, finalList);
@@ -310,5 +307,4 @@
     }
   </script>
 </body>
-
 </html>
